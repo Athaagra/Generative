@@ -16,6 +16,34 @@
 #!pip install omegaconf==2.0.0 pytorch-lightning==1.0.8
 #!pip uninstall torchtext --yes
 #!pip install einops
+#import numpy as np
+#np.Inf=np.inf
+#import torch
+#from torch import inf
+#from torch import string_classes
+#from torch._six import inf
+#string_classes = (str,)
+#int_classes = (int,)
+#from omegaconf import OmegaConf
+#from taming.models.vqgan import VQModel
+
+ #1. Load Config
+#config = OmegaConf.load('./models/vqgan_imagenet_f16_16384/configs/model.yaml')
+
+ #2. Instantiate Architecture (No trained weights yet)
+#model = VQModel(**config.model.params)
+
+ #3. Load Trained Weights (state_dict)
+#pl_sd = torch.load('./models/vqgan_imagenet_f16_16384/checkpoints/last.ckpt', map_location="cpu")
+#sd = pl_sd["state_dict"]
+
+ #4. Bind weights to the architecture
+#model.load_state_dict(sd, strict=False)
+#model.eval() # Set to evaluation mode
+
+
+
+
 
 import numpy as np
 np.Inf=np.inf
@@ -29,8 +57,8 @@ import torchvision.transforms.functional as TF
 import collections.abc as container_abcs 
 import PIL
 import matplotlib.pyplot as plt 
-string_classes = (str,)
-int_classes = (int,)
+#string_classes = (str,)
+#int_classes = (int,)
 
 import yaml 
 from omegaconf import OmegaConf 
@@ -95,9 +123,11 @@ def load_config(config_path, display=False):
     return config_data 
 
 def load_vqgan(config,chk_path=None):
+    print('This is config',config)
     model = VQModel(**config.model.params)
+    print('This is the model',model)
     if chk_path is not None:
-        state_dict = torch.load(chk_path, map_location="cpu")["state_dict"]
+        state_dict = torch.load(chk_path, map_location="cpu",weights_only=False)["state_dict"]
         missing, unexpected = model.load_state_dict(state_dict, strict=False)
     return model.eval()
 
@@ -114,7 +144,7 @@ taming_model = load_vqgan(taming_config, chk_path="./models/vqgan_imagenet_f16_1
 class Parameters(torch.nn.Module):
    def __init__(self):
        super(Parameters, self).__init__()
-       self.data = torch.randn(batch_size, 256, size//16, size2//16).cuda()
+       self.data = torch.randn(batch_size, 256, size1//16, size2//16).cuda()
        self.data = torch.nn.Parameter(torch.sin(self.data))
     
    def forward(self):
@@ -126,39 +156,39 @@ def init_params():
     return params, optimizer
     
     
-    ###Encoding prompts and a few more things
-    normalize = torchvision.transforms.Normalize((0.48145466, 0.4578275, 0.40821073),(0.26862954, 0.26130258,0.27577711))
+###Encoding prompts and a few more things
+normalize = torchvision.transforms.Normalize((0.48145466, 0.4578275, 0.40821073),(0.26862954, 0.26130258,0.27577711))
+
+def encodeText(text):
+    t=clip.tokenize(text).cuda()
+    t=clipmodel.encode_text(t).detach().clone()
+    return t 
+
+def createEncodings(include, exclude, extras):
+    include_enc=[]
+    for text in include:
+        include_enc.append(encodeText(text))
+    exclude_enc = encodeText(exclude) if exclude !='' else 0
+    extras_enc= encodeText(extras) if extras !='' else 0
     
-    def encodeText(text):
-        t=clip.tokenize(text).cuda()
-        t=clipmodel.encode_text(t).detach().clone()
-        return t 
-    
-    def createEncodings(include, exclude, extras):
-        include_enc=[]
-        for text in include:
-            include_enc.append(encodeText(text))
-        exclude_enc = encodeText(exclude) if exclude !='' else 0
-        extras_enc= encodeTet(extras) if extras !='' else 0
-        
-        return include_enc, exclude_enc, extras_enc
-    augTransform = torch.nn.Sequential(
-        torchvision.transforms.RandomHorizontalFlip(),
-        torchvision.transforms.RandomAffine(30, (.2, .2), fill=0)).cuda()
-    
-    Params, optimizer = init_params()
-    
-    with torch.no_grad():
-        print(Params().shape)
-        img= norm_data(generator(Params().cpu()))
-        print("img dimensions: ", img.shape)
-        show_from_tensor(img[0])
+    return include_enc, exclude_enc, extras_enc
+augTransform = torch.nn.Sequential(
+    torchvision.transforms.RandomHorizontalFlip(),
+    torchvision.transforms.RandomAffine(30, (.2, .2), fill=0)).cuda()
+
+Params, optimizer = init_params()
+
+with torch.no_grad():
+    print(Params().shape)
+    img= norm_data(generator(Params()).cpu())
+    print("img dimensions: ", img.shape)
+    show_from_tensor(img[0])
 
 ### create crops
 def create_crops(img, num_crops=30):
     p=size1/2
-    img = torch.nn.functional.pad(img, (p,p,p,p), mode='constant', value=0)
-    img = augTransforms(img)
+    img = torch.nn.functional.pad(img, (int(p),int(p),int(p),int(p)), mode='constant', value=0)
+    img = augTransform(img)
     crop_set=[]
     for ch in range(num_crops):
         gap1= int(torch.normal(1.0, .5, ()).clip(.2, 1.5) * size1)
@@ -166,9 +196,9 @@ def create_crops(img, num_crops=30):
         offsetx = torch.randint(0, int(size1*2-gap1),())
         offsety = torch.randint(0, int(size1*2-gap1),())
       
-        crop = img[:,:,offset:offset+gap2, offsety:offsety+gap2]
+        crop = img[:,:,offsetx:offsetx+gap2, offsety:offsety+gap2]
       
-        crop = torch.nn.functional.interpolate(crop(224,224), mode='bilinear', align_corners=True)
+        crop = torch.nn.functional.interpolate(crop,(224,224), mode='bilinear', align_corners=True)
         crop_set.append(crop)
     
     img_crops=torch.cat(crop_set,0)  
@@ -189,7 +219,7 @@ def showme(Params, show_crop):
         
         print("Generation")
         latest_gen=norm_data(generated.cpu())
-        show_from_tensor(latest_geo[0])
+        show_from_tensor(latest_gen[0])
     return (latest_gen[0])
     
 def optimize_result(Params, prompt):
@@ -214,7 +244,7 @@ def optimize_result(Params, prompt):
     return final_loss 
     
 def optimize(Params, optimizer, prompt):
-    loss = optimize_result(Params, promt).mean()
+    loss = optimize_result(Params, prompt).mean()
     optimizer.zero_grad()
     loss.backward()
     optimizer.step()
@@ -236,14 +266,14 @@ def training_loop(Params, optimizer, show_crop=False):
                  new_img = showme(Params, show_crop)
                  res_img.append(new_img)
                  res_z.append(Params())
-                 print("loss:", loss.item(), "\iteration:",iteration)
+                 print("loss:", loss.item(), "\n iteration:",iteration)
             iteration+=1
         torch.cuda.empty_cache()
     return res_img, res_z
  
 torch.cuda.empty_cache()
-include=['sketch of a lady','sketch of a man on a horse']
-exclude='watermark, cropped, confusing, incoherent, cut, blurry'
+include=['people kissing','people looking at the stars']
+exclude='cropped, incoherent, cut, blurry'
 extras= "watercolor paper texture"
 w1=1
 w2=2

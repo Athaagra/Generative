@@ -1,5 +1,8 @@
-#!pip install tensorflow-keras
-#!pip install tensorflow-probability 0.24.0
+#!pip install keras-cv==0.9.0 
+#!pip install keras-core==0.1.7
+#!pip install TensorFlow Probability 0.24.0
+#!pip install TensorFlow 2.13.1
+#!pip install keras==2.13.1
 import os
 #!pip install keras-cv keras-core --upgrade # Upgrade to latest compatible versions
 os.environ["KERAS_BACKEND"] = "tensorflow" # Explicitly set Keras 3 backend

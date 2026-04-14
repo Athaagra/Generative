@@ -1,3 +1,4 @@
+#approximately time 11-10 minutes
 #!pip install keras-cv==0.6.0 
 #!pip install keras-core==0.1.7
 #!pip install tensorflow-probability==0.24.0

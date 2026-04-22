@@ -1,3 +1,6 @@
+#tensorflow 2.11 cannot installed python 3.12
+#keras-cv 0.40.0 cannot execute the script
+#karas-cv 0.60.0 diffusion Stable model library is missing
 !pip install -q git+https://github.com/keras-team/keras-cv.git
 !pip install -q tensorflow==2.11.0
 import math
